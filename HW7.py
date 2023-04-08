@@ -165,16 +165,49 @@ def position_birth_search(position, age, cur, conn):
 #     the passed year.
 
 def make_winners_table(data, cur, conn):
-    pass
+    cur.execute('''CREATE TABLE IF NOT EXISTS Winners (id INTEGER PRIMARY KEY, name TEXT)''')
+    winners_added = []
+    data_seasons = data['seasons']
+    for season in data_seasons:
+        if season['winner']:
+            win_name = season['winner']['name']
+            win_id = season['winner']['id']
+            if win_id not in winners_added:
+                cur.execute("INSERT or ignore INTO Winners (id, name) VALUES (?, ?)", (win_id, win_name))
+                winners_added.append(win_id)
+    conn.commit()
 
 
 def make_seasons_table(data, cur, conn):
-    pass
+    cur.execute('''CREATE TABLE IF NOT EXISTS Seasons (id INTEGER PRIMARY KEY, winner_id TEXT, end_year INTEGER)''')
+    data_seasons = data['seasons']
+    for season in data_seasons:
+        win_name = None
+        win_year = season['endDate'][0:4]
+        season_id = season['id']
+        if season['winner']:
+            win_name = season['winner']['name']
+            cur.execute("SELECT id from Winners WHERE name = ?", (win_name,))     
+            winner = cur.fetchone()
+            win_id = winner[0]
+            cur.execute("INSERT or ignore INTO Seasons (id, winner_id, end_year) VALUES (?, ?, ?)",(season_id, win_id, win_year))    
+    conn.commit()
 
 
 def winners_since_search(year, cur, conn):
-    pass
+    cur.execute('''CREATE TABLE IF NOT EXISTS Seasons (id INTEGER PRIMARY KEY, winner_id TEXT, end_year INTEGER)''')
+    cur.execute('''CREATE TABLE IF NOT EXISTS Winners (id INTEGER PRIMARY KEY, name TEXT)''')
 
+    cur.execute("SELECT Seasons.winner_id, Winners.name FROM Seasons JOIN Winners ON Seasons.winner_id = Winners.id WHERE Seasons.end_year >= ?", (int(year),))
+    winners = cur.fetchall()
+    dataDict = {}
+    for winner in winners:
+        win_name = winner[1]
+        if win_name in dataDict:
+            dataDict[win_name] += 1
+        else:
+            dataDict[win_name] = 1
+    return dataDict
 
 class TestAllMethods(unittest.TestCase):
     def setUp(self):
@@ -233,17 +266,19 @@ class TestAllMethods(unittest.TestCase):
         self.cur2.execute('SELECT * from Winners')
         winners_list = self.cur2.fetchall()
 
-        pass
+        self.assertEqual(len(winners_list), 7)
+        self.assertEqual(winners_list[0][1],"Arsenal FC")
 
     def test_make_seasons_table(self):
         self.cur2.execute('SELECT * from Seasons')
         seasons_list = self.cur2.fetchall()
 
-        pass
+        self.assertEqual(len(seasons_list),28)
+        self.assertEqual(seasons_list[0][2], 2018)
 
     def test_winners_since_search(self):
 
-        pass
+        dataDict = winners_since_search(1000,self.cur,self.conn)
 
 
 def main():
